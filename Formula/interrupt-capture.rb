@@ -3,8 +3,8 @@ class InterruptCapture < Formula
 
   desc "Local plain-text CLI to capture & resume what you were doing when interrupted"
   homepage "https://github.com/chenshuai9101/interrupt-capture"
-  url "file:///tmp/interrupt-capture-0.2.0.tar.gz"
-  sha256 "67dc18ba265eafa061c99e1a610c3c5018a6959013c668cbbab82a300b29fd51"
+  url "https://github.com/chenshuai9101/interrupt-capture/archive/refs/tags/v0.2.0.tar.gz"
+  sha256 "98f79bd49e62af4538b6565df7abb98163c8eef552d50bfe6f221f499a48e7cf"
   version "0.2.0"
   license "MIT"
 
