@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interrupt Capture — a git stash for your brain</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --border:#26303d;
+    --fg:#e6edf3; --muted:#8b949e;
+  }
+  :root{ --accent:#3fb950; --accent2:#58a6ff; }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC",sans-serif;
+       background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:820px;margin:0 auto;padding:0 24px}
+  header{padding:90px 0 40px;text-align:center}
+  .badge{display:inline-block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+         color:var(--accent);border:1px solid var(--border);border-radius:999px;padding:5px 12px;margin-bottom:24px}
+  h1{font-size:clamp(34px,6vw,56px);line-height:1.08;margin:0 0 16px;letter-spacing:-.02em}
+  h1 .g{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:19px;color:var(--muted);max-width:620px;margin:0 auto 32px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:18px}
+  .btn{border-radius:8px;padding:12px 20px;font-weight:600;text-decoration:none;border:1px solid var(--border)}
+  .btn.primary{background:var(--accent);color:#04260f;border-color:transparent}
+  .btn.ghost{color:var(--fg)}
+  code,pre{font-family:"SF Mono",ui-monospace,Menlo,monospace}
+  .install{display:inline-block;background:var(--panel);border:1px solid var(--border);border-radius:8px;
+           padding:10px 16px;color:var(--fg);font-size:14px}
+  .install .p{color:var(--accent)}
+  section{padding:44px 0;border-top:1px solid var(--border)}
+  h2{font-size:24px;margin:0 0 8px;letter-spacing:-.01em}
+  .lead{color:var(--muted);margin:0 0 26px}
+  pre{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;overflow:auto;font-size:13.5px;color:#c9d4e0}
+  .term .dim{color:var(--muted)}
+  .term .acc{color:var(--accent)}
+  .term .blue{color:var(--accent2)}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:0}
+  .steps li{position:relative;padding:0 0 20px 44px}
+  .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:-2px;width:30px;height:30px;
+      display:grid;place-items:center;border:1px solid var(--border);border-radius:8px;color:var(--accent);font-weight:700}
+  .steps b{color:var(--fg)}
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .card h3{margin:0 0 6px;font-size:16px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{border:1px solid var(--border);padding:12px 14px;text-align:left;vertical-align:top;font-size:14px}
+  th{background:var(--panel)}
+  .price{font-size:20px;font-weight:700}
+  .note{color:var(--muted);font-size:13px;margin-top:12px;font-style:italic}
+  footer{padding:40px 0 70px;color:var(--muted);font-size:13px;text-align:center;border-top:1px solid var(--border)}
+  @media(max-width:640px){.feat{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="badge">Local · plain-text · no cloud</div>
+    <h1>A <span class="g">git stash</span> for your brain.</h1>
+    <p class="sub">Get interrupted. Type one line. Get back to exactly where you were —
+      the right dir, branch, file and line — in under 5 seconds.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Get it free</a>
+      <a class="btn ghost" href="#how">See how it works</a>
+    </div>
+    <div class="install"><span class="dim">$</span> brew install muyunye/tap/interrupt-capture</div>
+  </header>
+
+  <section id="problem">
+    <h2>The 40-minute hole</h2>
+    <p class="lead">You're deep in a bug. Slack pings. A meeting. Forty minutes later you're
+      staring at your editor thinking <em>“…what was I doing?”</em></p>
+    <p style="color:var(--muted)">Screen recorders watch everything and creep you out. Note apps become another
+      graveyard you forget to open. You don't need surveillance — you need a fast way back in.</p>
+  </section>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="lead">One command in, one command out.</p>
+    <ol class="steps">
+      <li><b>Capture</b> — a global hotkey or <code>ic "chasing the off-by-one in the parser"</code></li>
+      <li><b>Auto-context</b> — it grabs your cwd, git branch, active file:line and window. No typing.</li>
+      <li><b>Restore</b> — <code>ic resume</code> shows the last session per project and hands you the exact commands to jump back in.</li>
+    </ol>
+    <pre class="term"><span class="acc">📂 ~/work/api</span> <span class="dim">— 2m ago</span>
+  fixing 500 on /v2/users → <span class="blue">handlers/users.go:88</span>  <span class="dim">(branch: hotfix/users-500)</span>
+  <span class="acc">↩</span>  cd ~/work/api && git switch hotfix/users-500 && $EDITOR handlers/users.go:88</pre>
+  </section>
+
+  <section id="why">
+    <h2>Why it's different</h2>
+    <div class="feat">
+      <div class="card"><h3>Local &amp; plain-text</h3><p>Your notes live in <code>~/.interrupt-capture/*.md</code>. Grep them. Own them. Delete them. Zero cloud.</p></div>
+      <div class="card"><h3>No recording, no account</h3><p>No screen capture, no telemetry, no login. Privacy-first by construction.</p></div>
+      <div class="card"><h3>Terminal &amp; git native</h3><p>Built for people who live in a shell, not a dashboard.</p></div>
+      <div class="card"><h3>Running in 10 seconds</h3><p>Python stdlib only. No dependencies to babysit.</p></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Pricing</h2>
+    <p class="lead">Deliberately un-SaaS. The core is free forever.</p>
+    <table>
+      <tr><th>Free — OSS CLI</th><th>Pro — <span class="price">$25 one-time</span></th></tr>
+      <tr>
+        <td>capture · resume · project grouping · grep<br>plain-text, local, forever<br>MIT license</td>
+        <td><b>Global-hotkey capture</b> (reflexive)<br><b>One-command context restore</b> (cd / git switch / $EDITOR +line / tmux)<br>polished install + updates<br>no subscription, no sync, no snooping</td>
+      </tr>
+    </table>
+    <p class="note">We're not building an “attention analytics” product. We heard you. It stays a tool.</p>
+    <div style="margin-top:20px" class="install"><span class="dim">$</span> brew install muyunye/tap/interrupt-capture</div>
+  </section>
+
+  <footer>
+    Interrupt Capture · built by three AI agents (Claude · Codex · OpenClaw) · MIT ·
+    your data never leaves <code>~/.interrupt-capture/</code>
+  </footer>
+
+</div>
+</body>
+</html>

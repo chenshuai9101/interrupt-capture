@@ -36,9 +36,22 @@ ic "reviewing parser bug in src/parser.py:42"
 ic
 ic resume
 ic resume parser
+ic resume --all
 ic list
 ic --help
 ```
+
+`ic resume` shows the most recent entry for each project directory, so it works
+as a "where I left off" view. Each entry includes a copy-pasteable re-entry
+command prefixed with `↩`, for example:
+
+```sh
+↩  cd ~/code/app && git switch fix-login && ${EDITOR:-vim} +42 src/app.py
+```
+
+Use `ic resume --all` to show every entry grouped by project. Keyword filters
+still work with either view, such as `ic resume parser` or
+`ic resume --all parser`.
 
 Each capture appends one line to `~/.interrupt-capture/YYYY-MM-DD.md`:
 

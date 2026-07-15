@@ -7,6 +7,7 @@ import datetime as _dt
 import os
 import platform
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -20,7 +21,8 @@ HELP = """Interrupt Capture
 Usage:
   ic "note text"       Append a note to today's log.
   ic                  Read one note line from stdin, then append it.
-  ic resume [kw]      Show today's log, or the most recent log; filter by kw.
+  ic resume [kw]      Show last entry per project; filter by kw.
+  ic resume --all [kw] Show all entries per project; filter by kw.
   ic list             List available log dates.
   ic --help           Show this help.
 
@@ -29,10 +31,14 @@ Storage:
 """
 
 
-PATH_LINE_RE = re.compile(r"(?P<path>(?:~|/|\.|[\w.-]+/)[^\s:]+):(?P<line>\d+)")
+PATH_LINE_RE = re.compile(
+    r"(?P<path>(?:~|/|\.|[\w.-]+/|[\w.-]+\.[A-Za-z0-9_+-]+)[^\s:]*):(?P<line>\d+)"
+)
 PATH_RE = re.compile(r"(?<![\w/.-])(?P<path>(?:~|/|\.|[\w.-]+/)[^\s:]+)")
 CWD_RE = re.compile(r"(?:^|\s)::cwd=(?P<cwd>.*?)(?=\s::\w+=|$)")
+BRANCH_RE = re.compile(r"(?:^|\s)::branch=(?P<branch>.*?)(?=\s::\w+=|$)")
 TIME_RE = re.compile(r"^-\s+\[(?P<time>\d{2}:\d{2})\]")
+NOTE_RE = re.compile(r"^-\s+\[\d{2}:\d{2}\]\s+(?P<note>.*?)(?=\s+::\w+=|$)")
 
 
 def today_path() -> Path:
@@ -197,7 +203,11 @@ def find_open_hints(lines: list[str]) -> list[str]:
 
 def quote_path(path: Path) -> str:
     text = str(path)
-    return "'" + text.replace("'", "'\\''") + "'"
+    return quote_shell(text)
+
+
+def quote_shell(text: str) -> str:
+    return shlex.quote(text)
 
 
 def cwd_for_line(line: str) -> str:
@@ -208,6 +218,23 @@ def cwd_for_line(line: str) -> str:
 def time_for_line(line: str) -> str:
     match = TIME_RE.search(line)
     return match.group("time") if match else "--:--"
+
+
+def branch_for_line(line: str) -> str | None:
+    match = BRANCH_RE.search(line)
+    return match.group("branch") if match else None
+
+
+def note_for_line(line: str) -> str:
+    match = NOTE_RE.search(line)
+    return match.group("note") if match else line
+
+
+def path_line_for_line(line: str) -> tuple[str, str] | None:
+    match = PATH_LINE_RE.search(line)
+    if not match:
+        return None
+    return match.group("path").rstrip(".,);]"), match.group("line")
 
 
 def shorten_cwd(cwd: str) -> str:
@@ -225,7 +252,64 @@ def highlight_paths(line: str) -> str:
     return PATH_RE.sub(lambda m: color(m.group(0), "36"), line)
 
 
-def resume(keyword: str | None) -> int:
+def reentry_command(cwd: str, line: str) -> str:
+    command = f"cd {quote_shell(cwd)}"
+
+    branch = branch_for_line(line)
+    if branch:
+        command += f" && git switch {quote_shell(branch)}"
+
+    path_line = path_line_for_line(line)
+    if path_line:
+        file_path, line_no = path_line
+        command += f" && ${{EDITOR:-vim}} +{line_no} {quote_shell(file_path)}"
+
+    return command
+
+
+def print_resume_all(path: Path, grouped: dict[str, list[tuple[int, str]]]) -> None:
+    for cwd, entries in grouped.items():
+        last_time = time_for_line(entries[-1][1])
+        count = len(entries)
+        label = "entry" if count == 1 else "entries"
+        header = f"📂 {shorten_cwd(cwd)} — {count} {label} · last {last_time}"
+        print(color(header, "1;35"))
+
+        for line_no, line in entries:
+            location = color(str(path) + ":" + str(line_no), "1;35")
+            print(f"  {location}: {highlight_paths(line)}")
+            print(f"  ↩  {reentry_command(cwd, line)}")
+
+        hints = find_open_hints([line for _, line in entries])
+        if hints:
+            print("  open hints:")
+            for hint in hints:
+                print(f"    {hint}")
+
+
+def print_resume_latest(grouped: dict[str, list[tuple[int, str]]]) -> None:
+    for cwd, entries in grouped.items():
+        _, line = entries[-1]
+        time_text = time_for_line(line)
+        note = note_for_line(line)
+        details = [time_text]
+
+        branch = branch_for_line(line)
+        if branch:
+            details.append(f"branch {branch}")
+
+        path_line = path_line_for_line(line)
+        if path_line:
+            file_path, line_no = path_line
+            details.append(f"{file_path}:{line_no}")
+
+        print(color(f"📂 {shorten_cwd(cwd)}", "1;35"))
+        print(f"  {highlight_paths(note)}")
+        print(f"  {' · '.join(details)}")
+        print(f"  ↩  {reentry_command(cwd, line)}")
+
+
+def resume(keyword: str | None, show_all: bool = False) -> int:
     path = choose_resume_file()
     if path is None:
         print(f"no logs found in {APP_DIR}")
@@ -244,22 +328,10 @@ def resume(keyword: str | None) -> int:
     for line_no, line in numbered_lines:
         grouped.setdefault(cwd_for_line(line), []).append((line_no, line))
 
-    for cwd, entries in grouped.items():
-        last_time = time_for_line(entries[-1][1])
-        count = len(entries)
-        label = "entry" if count == 1 else "entries"
-        header = f"📂 {shorten_cwd(cwd)} — {count} {label} · last {last_time}"
-        print(color(header, "1;35"))
-
-        for line_no, line in entries:
-            location = color(str(path) + ":" + str(line_no), "1;35")
-            print(f"  {location}: {highlight_paths(line)}")
-
-        hints = find_open_hints([line for _, line in entries])
-        if hints:
-            print("  open hints:")
-            for hint in hints:
-                print(f"    {hint}")
+    if show_all:
+        print_resume_all(path, grouped)
+    else:
+        print_resume_latest(grouped)
 
     return 0
 
@@ -273,8 +345,13 @@ def main(argv: list[str]) -> int:
 
     command = argv[0]
     if command == "resume":
-        keyword = " ".join(argv[1:]) if len(argv) > 1 else None
-        return resume(keyword)
+        rest = argv[1:]
+        show_all = False
+        if "--all" in rest:
+            show_all = True
+            rest = [arg for arg in rest if arg != "--all"]
+        keyword = " ".join(rest) if rest else None
+        return resume(keyword, show_all=show_all)
     if command == "list":
         return list_logs()
 
