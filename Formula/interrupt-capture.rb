@@ -2,7 +2,7 @@ class InterruptCapture < Formula
   include Language::Python::Shebang
 
   desc "Local plain-text CLI to capture & resume what you were doing when interrupted"
-  homepage "https://github.com/muyunye/interrupt-capture"
+  homepage "https://github.com/chenshuai9101/interrupt-capture"
   url "file:///tmp/interrupt-capture-0.2.0.tar.gz"
   sha256 "67dc18ba265eafa061c99e1a610c3c5018a6959013c668cbbab82a300b29fd51"
   version "0.2.0"
