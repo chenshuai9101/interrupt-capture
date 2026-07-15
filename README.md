@@ -23,11 +23,16 @@ Make sure `~/bin` is on your `PATH`:
 export PATH="$HOME/bin:$PATH"
 ```
 
-Optional alias:
+## Sponsorship
+
+Interrupt Capture is 100% free & open source. If it helps you, sponsor via
+WeChat:
 
 ```sh
-alias resume='ic resume'
+ic sponsor
 ```
+
+The bundled QR is also available at `assets/sponsor-wechat.jpg`.
 
 ## Usage
 
@@ -38,6 +43,9 @@ ic resume
 ic resume parser
 ic resume --all
 ic list
+ic quick
+ic hotkey-setup
+ic sponsor
 ic --help
 ```
 
@@ -63,34 +71,56 @@ Each capture appends one line to `~/.interrupt-capture/YYYY-MM-DD.md`:
 On macOS, `::win=` is included when `osascript` can read the frontmost app or
 window title. If that fails, capture continues silently.
 
-## macOS Hotkey
+## Supporter Status
 
-GUI-launched shells do not inherit the `PATH` from your interactive terminal.
-Use the absolute `ic` path or export `PATH` inside the hotkey script.
-
-### Automator Quick Action
-
-1. Open Automator and create a new `Quick Action`.
-2. Set `Workflow receives` to `no input` in `any application`.
-3. Add `Run Shell Script`.
-4. Use this script:
+Mark this install as a supporter:
 
 ```sh
-IC="$HOME/bin/ic"
-note=$(/usr/bin/osascript -e 'text returned of (display dialog "Interrupt note:" default answer "" buttons {"Cancel", "Capture"} default button "Capture")')
-[ -n "$note" ] && "$IC" "$note"
+ic activate SUPPORTER-CODE
 ```
 
-5. Save it as `Interrupt Capture`.
-6. Open System Settings -> Keyboard -> Keyboard Shortcuts -> Services and bind
-   a shortcut to `Interrupt Capture`.
-
-### skhd
-
-Install and configure `skhd`, then add a binding like:
+Check status:
 
 ```sh
-cmd + shift - i : export PATH="$HOME/bin:$PATH"; note=$(/usr/bin/osascript -e 'text returned of (display dialog "Interrupt note:" default answer "" buttons {"Cancel", "Capture"} default button "Capture")'); [ -n "$note" ] && "$HOME/bin/ic" "$note"
+ic license
+ic activate --status
 ```
 
-Reload `skhd` after editing its config.
+The supporter marker is stored at `~/.interrupt-capture/supporter` with mode
+`600`. `IC_SUPPORTER_CODE` can override the file for testing or CI. Supporter
+status is a thank-you perk that silences the occasional sponsorship nudge; it
+does not unlock features.
+
+## Quick Capture And Hotkey Setup
+
+`ic quick` captures through a native macOS dialog:
+
+```sh
+ic quick
+```
+
+Empty input or cancel captures nothing and exits quietly. On non-macOS systems,
+`ic quick` falls back to the normal stdin prompt.
+
+Print setup instructions:
+
+```sh
+ic hotkey-setup
+```
+
+If `skhd` is on `PATH`, this prints the exact line to add to `~/.skhdrc`.
+Use `--write` to append it automatically:
+
+```sh
+ic hotkey-setup --write
+```
+
+The command also prints a macOS Shortcuts / Automator Quick Action recipe.
+GUI-launched shells do not inherit `PATH`, so the recipe always uses the
+absolute `ic` path.
+
+## Honesty Note
+
+An open-source client cannot enforce a license: any local gate is trivially
+bypassable. Interrupt Capture is therefore free and open; sponsorship is an
+honest "buy me a coffee" model, not access control.

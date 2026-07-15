@@ -1,2 +1,9 @@
 __pycache__/
 *.pyc
+.env
+*.secret
+secrets/
+
+# never commit mint secrets
+*.secret
+.mint_secret

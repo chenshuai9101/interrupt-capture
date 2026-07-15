@@ -41,16 +41,13 @@ You don't need surveillance. You need a fast way back in.
 - **Terminal & git native.** Built for people who live in a shell, not a dashboard.
 - **Zero to running in 10 seconds.** Python stdlib only, no dependencies to babysit.
 
-## Pricing (validated, deliberately un-SaaS)
+## Pricing — 100% free, sponsor-supported
 
-| Free — OSS CLI | Pro — one-time $25 |
-|---|---|
-| capture, resume, grouping, grep | global-hotkey capture (reflexive) |
-| plain-text, local, forever | **one-command context restore** (`cd`/`git switch`/`$EDITOR +line`/tmux) |
-| MIT license | polished install + updates |
-| | no subscription, no sync, no snooping |
+Every feature is free and open source: capture, one-command restore, project grouping, global-hotkey capture. No paywall, no subscription, no sync, no snooping.
 
-> We're not building an "attention analytics" product. We heard you. It stays a tool.
+If it saves you from a "…what was I doing?" moment, **sponsor via WeChat** (`ic sponsor`) — that's what keeps it maintained.
+
+> An open-source client can't honestly enforce a license, so we don't pretend to. It's a tool you can trust, funded by the people it helps.
 
 ## FAQ
 - **Does it phone home?** No. Ever. Read the source — it's one file.

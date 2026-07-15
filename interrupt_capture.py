@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import base64
 import os
 import platform
 import re
@@ -13,7 +14,9 @@ import sys
 from pathlib import Path
 
 
+VERSION = "0.3.1"
 APP_DIR = Path.home() / ".interrupt-capture"
+SUPPORTER_PATH = APP_DIR / "supporter"
 
 
 HELP = """Interrupt Capture
@@ -24,6 +27,13 @@ Usage:
   ic resume [kw]      Show last entry per project; filter by kw.
   ic resume --all [kw] Show all entries per project; filter by kw.
   ic list             List available log dates.
+  ic quick            Capture via native prompt / stdin fallback. Free.
+  ic hotkey-setup     Print global-hotkey setup instructions. Free.
+  ic sponsor          Open the WeChat sponsor QR.
+  ic activate <CODE>  Mark this install as a supporter.
+  ic activate --status Show supporter status.
+  ic license          Show supporter status.
+  ic --version        Show version.
   ic --help           Show this help.
 
 Storage:
@@ -31,6 +41,7 @@ Storage:
 """
 
 
+SUPPORTER_RE = re.compile(r"^(?:SUPPORTER-[A-Z0-9][A-Z0-9-]*|IC-PRO-[A-Z2-7]{10}-[A-Z2-7]{4})$")
 PATH_LINE_RE = re.compile(
     r"(?P<path>(?:~|/|\.|[\w.-]+/|[\w.-]+\.[A-Za-z0-9_+-]+)[^\s:]*):(?P<line>\d+)"
 )
@@ -47,6 +58,81 @@ def today_path() -> Path:
 
 def ensure_app_dir() -> None:
     APP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def base32_no_padding(data: bytes) -> str:
+    return base64.b32encode(data).decode("ascii").rstrip("=")
+
+
+def structurally_valid_supporter_code(code: str) -> bool:
+    return bool(SUPPORTER_RE.fullmatch(code.strip().upper()))
+
+
+def read_supporter_code() -> str | None:
+    env_key = os.environ.get("IC_SUPPORTER_CODE") or os.environ.get("IC_PRO_LICENSE")
+    if env_key:
+        return env_key.strip()
+
+    try:
+        return SUPPORTER_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        old_path = APP_DIR / "license"
+        try:
+            return old_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+
+
+def is_supporter() -> bool:
+    code = read_supporter_code()
+    return bool(code and structurally_valid_supporter_code(code))
+
+
+def activate(code: str) -> int:
+    code = code.strip().upper()
+    if not structurally_valid_supporter_code(code):
+        print("invalid supporter code")
+        return 1
+
+    ensure_app_dir()
+    SUPPORTER_PATH.write_text(code + "\n", encoding="utf-8")
+    SUPPORTER_PATH.chmod(0o600)
+    print("supporter mode on")
+    return 0
+
+
+def license_status() -> int:
+    print("supporter" if is_supporter() else "not a supporter yet")
+    return 0
+
+
+def bundled_sponsor_qr() -> Path | None:
+    script_dir = Path(__file__).resolve().parent
+    candidates = [
+        script_dir / "assets" / "sponsor-wechat.jpg",
+        script_dir.parent / "share" / "interrupt-capture" / "assets" / "sponsor-wechat.jpg",
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    return candidates[0]
+
+
+def sponsor() -> int:
+    print("Interrupt Capture is free & open source; if it saves you time, consider sponsoring.")
+    print('WeChat "陈帅"')
+    path = bundled_sponsor_qr()
+    if platform.system() == "Darwin" and path and path.is_file():
+        try:
+            result = subprocess.run(["open", str(path)], check=False)
+        except (OSError, subprocess.SubprocessError):
+            print(f"QR: {path}")
+        else:
+            if result.returncode != 0:
+                print(f"QR: {path}")
+    else:
+        print(f"QR: {path}")
+    return 0
 
 
 def clean_field(value: str) -> str:
@@ -132,7 +218,19 @@ def append_note(note: str) -> int:
         handle.write(line + "\n")
 
     print(f"captured: {path}")
+    maybe_print_sponsor_nudge(path)
     return 0
+
+
+def maybe_print_sponsor_nudge(path: Path) -> None:
+    if is_supporter():
+        return
+    try:
+        capture_count = sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.startswith("- ["))
+    except OSError:
+        return
+    if capture_count > 0 and capture_count % 20 == 0:
+        print("❤  enjoying ic? support it: ic sponsor")
 
 
 def read_interactive_note() -> str:
@@ -141,6 +239,39 @@ def read_interactive_note() -> str:
         return input("note> ")
     except EOFError:
         return ""
+
+
+def quick_capture() -> int:
+    if platform.system() == "Darwin":
+        script = (
+            'display dialog "What are you doing?" default answer "" '
+            'with title "Interrupt Capture"'
+        )
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return 0
+
+        if result.returncode != 0:
+            return 0
+        prefix = "button returned:OK, text returned:"
+        output = result.stdout.rstrip("\n")
+        note = output[len(prefix) :] if output.startswith(prefix) else output.strip()
+        if not clean_field(note):
+            return 0
+        return append_note(note)
+
+    note = read_interactive_note()
+    if not clean_field(note):
+        return 0
+    return append_note(note)
 
 
 def log_files() -> list[Path]:
@@ -267,6 +398,51 @@ def reentry_command(cwd: str, line: str) -> str:
     return command
 
 
+def command_path() -> str:
+    found = shutil_which("ic")
+    if found:
+        return found
+    return str(Path(__file__).resolve())
+
+
+def shutil_which(name: str) -> str | None:
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if not directory:
+            continue
+        candidate = Path(directory) / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def hotkey_setup(write: bool = False) -> int:
+    ic_path = command_path()
+    skhd_line = f"cmd + shift - space : {quote_shell(ic_path)} quick"
+
+    skhd_path = shutil_which("skhd")
+    if skhd_path:
+        print("skhd detected.")
+        print(f"Add this line to ~/.skhdrc:\n{skhd_line}")
+        if write:
+            skhdrc = Path.home() / ".skhdrc"
+            with skhdrc.open("a", encoding="utf-8") as handle:
+                handle.write(skhd_line + "\n")
+            print(f"appended to {skhdrc}")
+    else:
+        print("skhd not found on PATH.")
+        print(f"If you install skhd, add this line to ~/.skhdrc:\n{skhd_line}")
+
+    print()
+    print("macOS Shortcuts / Automator Quick Action:")
+    print("1. Create a Shortcut or Automator Quick Action with no input.")
+    print("2. Add Run Shell Script.")
+    print(f"3. Use this command: {quote_shell(ic_path)} quick")
+    print("4. Assign a keyboard shortcut in System Settings -> Keyboard -> Keyboard Shortcuts.")
+    print()
+    print("GUI-launched shells do not inherit PATH; use the absolute path above.")
+    return 0
+
+
 def print_resume_all(path: Path, grouped: dict[str, list[tuple[int, str]]]) -> None:
     for cwd, entries in grouped.items():
         last_time = time_for_line(entries[-1][1])
@@ -344,6 +520,9 @@ def main(argv: list[str]) -> int:
         return append_note(read_interactive_note())
 
     command = argv[0]
+    if command == "--version":
+        print(VERSION)
+        return 0
     if command == "resume":
         rest = argv[1:]
         show_all = False
@@ -354,6 +533,25 @@ def main(argv: list[str]) -> int:
         return resume(keyword, show_all=show_all)
     if command == "list":
         return list_logs()
+    if command == "quick":
+        return quick_capture()
+    if command == "sponsor":
+        return sponsor()
+    if command == "hotkey-setup":
+        rest = argv[1:]
+        if any(arg not in {"--write"} for arg in rest):
+            print(HELP.rstrip())
+            return 1
+        return hotkey_setup(write="--write" in rest)
+    if command == "activate":
+        if argv[1:] == ["--status"]:
+            return license_status()
+        if len(argv) != 2:
+            print("usage: ic activate <KEY>")
+            return 1
+        return activate(argv[1])
+    if command == "license":
+        return license_status()
 
     return append_note(" ".join(argv))
 
